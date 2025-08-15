@@ -1,17 +1,23 @@
 use std::error::Error;
 
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
+
 use crate::{PokerControllerTrait, PokerViewTrait, UserAction, UserActionError};
 
+#[derive(Debug)]
 struct PokerCard {
-    value: i32,
-    colour: PokerCardColour,
+    value: CardValue,
+    colour: CardColour,
 }
 
-enum PokerCardColour {
-    Clubs,
-    Diamonds,
-    Hearts,
-    Spades,
+#[derive(EnumIter, Clone, Copy, Debug)]
+enum CardColour {
+    Clubs, Diamonds, Hearts, Spades, }
+
+#[derive(EnumIter, Clone, Copy, Debug)]
+enum CardValue {
+    Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King, Ace,
 }
 
 pub struct Player {
@@ -25,6 +31,15 @@ pub struct PokerModel {
     pot: i64,
     river: Vec<PokerCard>,
     players: Vec<Player>,
+    deck: Vec<PokerCard>,
+}
+
+impl PokerModel {
+    fn init_game(&mut self) {
+        self.deck = CardColour::iter()
+            .flat_map(|colour| CardValue::iter().map(move |value| PokerCard { colour, value }))
+            .collect();
+    }
 }
 
 pub trait PokerModelTrait {
@@ -34,7 +49,7 @@ pub trait PokerModelTrait {
         view: View,
         controller: Controller,
     );
-    fn run(&self) -> Result<(), Box<dyn Error>>;
+    fn run(&mut self) -> Result<(), Box<dyn Error>>;
 }
 
 impl PokerModelTrait for PokerModel {
@@ -43,10 +58,15 @@ impl PokerModelTrait for PokerModel {
             pot: 0,
             river: Vec::new(),
             players: Vec::new(),
+            deck: Vec::new(),
         }
     }
 
-    fn add_player<View: PokerViewTrait + 'static, Controller: PokerControllerTrait + 'static> (&mut self, view: View, controller: Controller) {
+    fn add_player<View: PokerViewTrait + 'static, Controller: PokerControllerTrait + 'static>(
+        &mut self,
+        view: View,
+        controller: Controller,
+    ) {
         self.players.push(Player {
             view: Box::new(view),
             controller: Box::new(controller),
@@ -55,8 +75,12 @@ impl PokerModelTrait for PokerModel {
         });
     }
 
-    fn run(&self) -> Result<(), Box<dyn Error>> {
-        self.players.iter().for_each(|p| p.view.report("Welcome to poker."));
+    fn run(&mut self) -> Result<(), Box<dyn Error>> {
+        self.players
+            .iter()
+            .for_each(|p| p.view.report("Welcome to poker."));
+
+        &self.init_game();
 
         for i in (0..self.players.len()).cycle() {
             let player = self.players.get(i).unwrap();
@@ -72,7 +96,6 @@ impl PokerModelTrait for PokerModel {
                 Err(UserActionError::UnknownArgument) => view.report("invalid argument."),
             }
         }
-
 
         Ok(())
     }
